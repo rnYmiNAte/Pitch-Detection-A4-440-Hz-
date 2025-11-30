@@ -1,0 +1,52 @@
+name: Pitch detection (A4 = 440 Hz)
+
+on:
+  push:
+    paths:
+      - '**.mp3'
+      - '**.wav'
+  workflow_dispatch:
+    inputs:
+      path:
+        description: 'Path or glob to search for audio files (default: **/*)'
+        required: false
+        default: '**/*'
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libsndfile1
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+
+      - name: Install Python requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r scripts/requirements.txt
+
+      - name: Run pitch detection
+        run: |
+          python scripts/detect_pitch.py --glob "${{ github.event.inputs.path || '**/*' }}" --tolerance-cents 50 --min-duration 0.05
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitch-detection-results
+          path: results/pitch_detection_results.csv
